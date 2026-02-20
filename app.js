@@ -265,9 +265,9 @@ function setTurnPlayer(playerId) {
       maybeAdvanceFinalRound(playerId);
     }
 		// Decide who is next (auto-advance)
-		const nextId = nextPlayerIdAfter(playerId);
+	const nextId = nextPlayerIdAfter(playerId);
     rerender();
-		if (!state.locked && nextId) setTurnPlayer(nextId);
+	if (!state.locked && nextId) setTurnPlayer(nextId);
   }
 
   function undoLast() {
