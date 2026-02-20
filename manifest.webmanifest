@@ -1,0 +1,17 @@
+{
+  "name": "Zombie Dice Score",
+  "short_name": "Zombie Dice",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0f0d",
+  "theme_color": "#0b0f0d",
+  "description": "Offline score tracker for Zombie Dice.",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230b0f0d'/%3E%3Ctext x='50%25' y='58%25' text-anchor='middle' font-size='280'%3E%F0%9F%A7%9F%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

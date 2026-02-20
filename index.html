@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b0f0d" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Ctext y='0.9em' font-size='96'%3E%F0%9F%A7%9F%3C/text%3E%3C/svg%3E" />
+  <title>Zombie Dice Score</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin: 0; padding: 16px; background: #0b0f0d; color: #e9f6ee; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .muted { opacity: .8; font-size: 12px; }
+    .card { background: #121a16; border: 1px solid #26362e; border-radius: 12px; padding: 12px; margin: 10px 0; }
+    label { display:block; font-size: 12px; opacity: .9; margin-top: 10px; }
+    input, button, select {
+      width: 100%; padding: 10px; margin-top: 6px;
+      border-radius: 10px; border: 1px solid #2b3a32;
+      background: #0e1511; color: #e9f6ee; font-size: 16px;
+    }
+    button { cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #223128; }
+    th { font-size: 12px; opacity: .9; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .pill { display:inline-block; padding: 3px 10px; border: 1px solid #2b3a32; border-radius: 999px; font-size: 12px; }
+    .good { border-color: #4ad38a; }
+    .warn { border-color: #f2c94c; }
+    .danger { border-color: #ff6b6b; }
+    .btnRow { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    .small { font-size: 13px; padding: 9px; }
+    .banner { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+  </style>
+</head>
+<body>
+  <h1>🧟 Zombie Dice Score</h1>
+  <div class="muted">Offline PWA. On iPhone: Share → Add to Home Screen.</div>
+
+  <div class="card">
+    <div class="banner">
+      <div><strong>Status</strong></div>
+      <div id="statusBadge" class="pill">Waiting…</div>
+    </div>
+    <div id="statusText" class="muted" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Add player</label>
+        <input id="playerName" placeholder="e.g., Isaac" />
+      </div>
+      <div style="align-self:end;">
+        <button id="addPlayerBtn">Add</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Target brains</label>
+        <input id="targetScore" type="number" inputmode="numeric" min="1" step="1" />
+      </div>
+      <div style="align-self:end;">
+        <button id="applyTargetBtn" class="small">Apply target</button>
+      </div>
+    </div>
+
+    <div class="btnRow">
+      <button class="small" id="newGameBtn">New Game (reset)</button>
+      <button class="small danger" id="clearDataBtn">Clear Saved Data</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Whose turn?</label>
+        <select id="turnPlayer"></select>
+      </div>
+      <div>
+        <label>Banked brains this turn</label>
+        <input id="brains" type="number" inputmode="numeric" min="0" step="1" placeholder="0" />
+      </div>
+    </div>
+
+    <div class="row3">
+      <div>
+        <label>Shotguns (optional)</label>
+        <input id="shotguns" type="number" inputmode="numeric" min="0" step="1" placeholder="0" />
+      </div>
+      <div>
+        <label>Notes (optional)</label>
+        <input id="note" placeholder="e.g., busted / big run" />
+      </div>
+      <div style="align-self:end;">
+        <button id="logTurnBtn">Log Turn</button>
+      </div>
+    </div>
+
+    <div class="btnRow">
+      <button class="small" id="undoBtn">Undo Last Turn</button>
+      <button class="small" id="lockBtn">Lock Game</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div><strong>Scoreboard</strong></div>
+      <div id="leaderBadge" class="pill">No players yet</div>
+    </div>
+    <div style="overflow:auto; margin-top:10px;">
+      <table>
+        <thead>
+          <tr><th>Player</th><th>Total Brains</th><th>Turns</th></tr>
+        </thead>
+        <tbody id="scoreBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div><strong>Turn Log</strong> <span class="muted">(latest first)</span></div>
+    <div id="log" class="muted" style="margin-top:10px;"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    // Register service worker (required for offline + installability)
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
+    }
+  </script>
+</body>
+</html>
