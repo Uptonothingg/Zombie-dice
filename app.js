@@ -5,8 +5,8 @@
 
   const state = {
     players: [],          // {id, name, total, turns}
-    log: [],              // entries
-    target: 13,           // target brains
+    log: [],              // {ts, playerId, brains, shotguns, note}
+    target: 13,
     locked: false,
 
     // Final-round rule:
@@ -59,19 +59,24 @@
   }
 
   function statusLine() {
-    if (state.players.length === 0) return { badge: "Add players", kind: "", text: "Add at least 1 player to start." };
-    if (state.locked) return { badge: "Game locked", kind: "danger", text: "This game is locked. Start a New Game to play again." };
+    if (state.players.length === 0) {
+      return { badge: "Add players", kind: "", text: "Add at least 1 player to start." };
+    }
+    if (state.locked) {
+      return { badge: "Game over", kind: "good", text: "Final round is complete. Tap New Game to play again." };
+    }
 
     if (state.finalRound.active) {
       const remainingNames = state.finalRound.remainingIds
         .map(id => state.players.find(p => p.id === id)?.name)
         .filter(Boolean);
 
+      const starterName = state.players.find(p => p.id === state.finalRound.starterId)?.name || "Someone";
+
       if (remainingNames.length === 0) {
-        return { badge: "Final turn complete", kind: "good", text: "Final round is complete. The game is now locked." };
+        return { badge: "Final round complete", kind: "good", text: "Final round is complete. The game is now locked." };
       }
 
-      const starterName = state.players.find(p => p.id === state.finalRound.starterId)?.name || "Someone";
       return {
         badge: "Final round!",
         kind: "warn",
@@ -79,7 +84,45 @@
       };
     }
 
-    return { badge: "Game active", kind: "good", text: `Playing to ${state.target} brains. When someone reaches it, everyone else gets one last turn.` };
+    return {
+      badge: "Game active",
+      kind: "good",
+      text: `Playing to ${state.target} brains. When someone reaches it, everyone else gets one last turn.`
+    };
+  }
+
+  // Auto-advance helpers
+  function nextPlayerIdAfter(currentId) {
+    if (state.players.length === 0) return null;
+
+    const order = state.players.map(p => p.id);
+    const idx = order.indexOf(currentId);
+    let i = idx >= 0 ? idx : 0;
+
+    for (let step = 0; step < order.length; step++) {
+      i = (i + 1) % order.length;
+      const candidate = order[i];
+
+      // If final round is active, the starter should NOT take another turn
+      if (state.finalRound.active && candidate === state.finalRound.starterId) continue;
+
+      // If final round is active, only allow players who still have their last turn
+      if (state.finalRound.active) {
+        if (state.finalRound.remainingIds.includes(candidate)) return candidate;
+        continue;
+      }
+
+      return candidate;
+    }
+
+    // If no valid candidate found, return current
+    return currentId;
+  }
+
+  function setTurnPlayer(playerId) {
+    const sel = $("turnPlayer");
+    if (!sel) return;
+    sel.value = playerId;
   }
 
   function rerender() {
@@ -88,12 +131,19 @@
 
     // Player select
     const sel = $("turnPlayer");
+    const currentSelected = sel?.value || null;
+
     sel.innerHTML = "";
     for (const p of state.players) {
       const opt = document.createElement("option");
       opt.value = p.id;
       opt.textContent = p.name;
       sel.appendChild(opt);
+    }
+
+    // Restore selection if possible
+    if (currentSelected && state.players.some(p => p.id === currentSelected)) {
+      sel.value = currentSelected;
     }
 
     // Scoreboard
@@ -150,9 +200,8 @@
       }).join("");
     }
 
-    // Buttons / inputs enabled state
+    // Inputs enabled state
     const canPlay = !state.locked && state.players.length > 0;
-
     $("logTurnBtn").disabled = !canPlay;
     $("brains").disabled = !canPlay;
     $("shotguns").disabled = !canPlay;
@@ -163,7 +212,6 @@
     $("addPlayerBtn").disabled = state.locked;
 
     $("undoBtn").disabled = state.locked || state.log.length === 0;
-    $("lockBtn").disabled = state.locked;
 
     save();
   }
@@ -172,20 +220,20 @@
     const n = (name || "").trim();
     if (!n || state.locked) return;
     state.players.push({ id: uid(), name: n, total: 0, turns: 0 });
-		// Decide who is next (auto-advance)
-		const nextId = nextPlayerIdAfter(playerId);
     rerender();
+
+    // If this is the first player, select them
+    if (state.players.length === 1) setTurnPlayer(state.players[0].id);
   }
 
   function startFinalRound(starterId) {
-  state.finalRound.active = true;
-  state.finalRound.starterId = starterId;
+    state.finalRound.active = true;
+    state.finalRound.starterId = starterId;
 
-  // Keep remainingIds in seating order (the order players were added)
-  state.finalRound.remainingIds = state.players
-    .map(p => p.id)
-    .filter(id => id !== starterId);
-}
+    // Keep remainingIds in seating order (order players were added)
+    state.finalRound.remainingIds = state.players
+      .map(p => p.id)
+      .filter(id => id !== starterId);
   }
 
   function maybeAdvanceFinalRound(playerId) {
@@ -200,42 +248,7 @@
       state.locked = true;
     }
   }
-	function nextPlayerIdAfter(currentId) {
-  if (state.players.length === 0) return null;
 
-  const order = state.players.map(p => p.id);
-  const idx = Math.max(0, order.indexOf(currentId));
-  let i = idx;
-
-  // Try up to N players to find the next valid choice
-  for (let step = 0; step < order.length; step++) {
-    i = (i + 1) % order.length;
-    const candidate = order[i];
-
-    // If the game is in final round, the starter should NOT take another turn
-    if (state.finalRound.active && candidate === state.finalRound.starterId) continue;
-
-    // If final round is active, prefer players who still have their last turn
-    if (state.finalRound.active) {
-      if (state.finalRound.remainingIds.includes(candidate)) return candidate;
-      // If candidate already took last turn, skip them
-      continue;
-    }
-
-    return candidate;
-  }
-
-  // Fallback: if we somehow didn't find anyone, just return current
-  return currentId;
-}
-
-function setTurnPlayer(playerId) {
-  const sel = $("turnPlayer");
-  if (!sel) return;
-  sel.value = playerId;
-}
-
-	
   function logTurn(playerId, brains, shotguns, note) {
     if (state.locked) return;
     const p = state.players.find(x => x.id === playerId);
@@ -256,35 +269,22 @@ function setTurnPlayer(playerId) {
       note: (note || "").trim()
     });
 
-    // If final round not started yet, check trigger
+    // Trigger final round if not active yet
     if (!state.finalRound.active && p.total >= state.target) {
       startFinalRound(playerId);
       // Starter does NOT get another turn; everyone else does.
-    } else {
+    } else if (state.finalRound.active) {
       // If final round already active, mark down remaining
       maybeAdvanceFinalRound(playerId);
     }
-		// Decide who is next (auto-advance)
-	const nextId = nextPlayerIdAfter(playerId);
-    rerender();
-	if (!state.locked && nextId) setTurnPlayer(nextId);
-  }
 
-  function undoLast() {
-    if (state.locked) return;
-    const last = state.log.pop();
-    if (!last) return;
-
-    const p = state.players.find(x => x.id === last.playerId);
-    if (p) {
-      p.total = Math.max(0, p.total - last.brains);
-      p.turns = Math.max(0, p.turns - 1);
-    }
-
-    // Simplest, safest undo: recompute final round + lock from scratch
-    recomputeFinalRoundFromLog();
+    // Auto-advance
+    const nextId = nextPlayerIdAfter(playerId);
 
     rerender();
+
+    // After re-render, set selection to next player (unless game is locked now)
+    if (!state.locked && nextId) setTurnPlayer(nextId);
   }
 
   function recomputeFinalRoundFromLog() {
@@ -310,6 +310,21 @@ function setTurnPlayer(playerId) {
     }
   }
 
+  function undoLast() {
+    if (state.locked) return;
+    const last = state.log.pop();
+    if (!last) return;
+
+    // Recompute everything safely
+    recomputeFinalRoundFromLog();
+    rerender();
+
+    // Put turn selector back on the person who was undone (nice UX)
+    if (!state.locked && state.players.some(p => p.id === last.playerId)) {
+      setTurnPlayer(last.playerId);
+    }
+  }
+
   function newGame() {
     // Keep players & target, reset everything else
     for (const p of state.players) { p.total = 0; p.turns = 0; }
@@ -317,6 +332,9 @@ function setTurnPlayer(playerId) {
     state.locked = false;
     state.finalRound = { active: false, starterId: null, remainingIds: [] };
     rerender();
+
+    // Select first player again
+    if (state.players.length > 0) setTurnPlayer(state.players[0].id);
   }
 
   function clearData() {
@@ -339,14 +357,27 @@ function setTurnPlayer(playerId) {
   }
 
   // Events
-  $("addPlayerBtn").addEventListener("click", () => addPlayer($("playerName").value));
-  $("playerName").addEventListener("keydown", (e) => { if (e.key === "Enter") addPlayer($("playerName").value); });
+  $("addPlayerBtn").addEventListener("click", () => {
+    addPlayer($("playerName").value);
+    $("playerName").value = "";
+    $("playerName").focus();
+  });
+
+  $("playerName").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      addPlayer($("playerName").value);
+      $("playerName").value = "";
+      $("playerName").focus();
+    }
+  });
 
   $("applyTargetBtn").addEventListener("click", applyTarget);
 
   $("logTurnBtn").addEventListener("click", () => {
     const pid = $("turnPlayer").value;
     logTurn(pid, $("brains").value, $("shotguns").value, $("note").value);
+
+    // Clear and focus for next entry
     $("brains").value = "";
     $("shotguns").value = "";
     $("note").value = "";
@@ -356,13 +387,17 @@ function setTurnPlayer(playerId) {
   $("undoBtn").addEventListener("click", undoLast);
   $("newGameBtn").addEventListener("click", newGame);
   $("clearDataBtn").addEventListener("click", clearData);
-  $("lockBtn").addEventListener("click", () => { state.locked = true; rerender(); });
 
   // Init
   load();
-  // Ensure target input shows current value
   $("targetScore").value = state.target;
-  // If data existed, make sure derived state is consistent
+
+  // Ensure derived state is consistent with log
   recomputeFinalRoundFromLog();
   rerender();
+
+  // If we have players and nothing selected, select first
+  if (state.players.length > 0 && !$("turnPlayer").value) {
+    setTurnPlayer(state.players[0].id);
+  }
 })();
