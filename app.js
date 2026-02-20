@@ -172,6 +172,8 @@
     const n = (name || "").trim();
     if (!n || state.locked) return;
     state.players.push({ id: uid(), name: n, total: 0, turns: 0 });
+		// Decide who is next (auto-advance)
+		const nextId = nextPlayerIdAfter(playerId);
     rerender();
   }
 
@@ -195,7 +197,42 @@
       state.locked = true;
     }
   }
+	function nextPlayerIdAfter(currentId) {
+  if (state.players.length === 0) return null;
 
+  const order = state.players.map(p => p.id);
+  const idx = Math.max(0, order.indexOf(currentId));
+  let i = idx;
+
+  // Try up to N players to find the next valid choice
+  for (let step = 0; step < order.length; step++) {
+    i = (i + 1) % order.length;
+    const candidate = order[i];
+
+    // If the game is in final round, the starter should NOT take another turn
+    if (state.finalRound.active && candidate === state.finalRound.starterId) continue;
+
+    // If final round is active, prefer players who still have their last turn
+    if (state.finalRound.active) {
+      if (state.finalRound.remainingIds.includes(candidate)) return candidate;
+      // If candidate already took last turn, skip them
+      continue;
+    }
+
+    return candidate;
+  }
+
+  // Fallback: if we somehow didn't find anyone, just return current
+  return currentId;
+}
+
+function setTurnPlayer(playerId) {
+  const sel = $("turnPlayer");
+  if (!sel) return;
+  sel.value = playerId;
+}
+
+	
   function logTurn(playerId, brains, shotguns, note) {
     if (state.locked) return;
     const p = state.players.find(x => x.id === playerId);
@@ -224,8 +261,10 @@
       // If final round already active, mark down remaining
       maybeAdvanceFinalRound(playerId);
     }
-
+		// Decide who is next (auto-advance)
+		const nextId = nextPlayerIdAfter(playerId);
     rerender();
+		if (!state.locked && nextId) setTurnPlayer(nextId);
   }
 
   function undoLast() {
