@@ -178,11 +178,14 @@
   }
 
   function startFinalRound(starterId) {
-    state.finalRound.active = true;
-    state.finalRound.starterId = starterId;
-    state.finalRound.remainingIds = state.players
-      .filter(p => p.id !== starterId)
-      .map(p => p.id);
+  state.finalRound.active = true;
+  state.finalRound.starterId = starterId;
+
+  // Keep remainingIds in seating order (the order players were added)
+  state.finalRound.remainingIds = state.players
+    .map(p => p.id)
+    .filter(id => id !== starterId);
+}
   }
 
   function maybeAdvanceFinalRound(playerId) {
